@@ -423,3 +423,104 @@ def export_data(
     df.to_csv(output_path, index=False)
 
     return str(output_path)
+
+
+def preprocess_ford_gobike(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preprocess Ford GoBike dataset with all necessary transformations.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Raw Ford GoBike DataFrame.
+    
+    Returns:
+    --------
+    pd.DataFrame
+        Preprocessed DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Fill missing gender and birth year with 'Unknown'
+    df_clean = fill_missing_categorical(df_clean, ['member_gender'], 'Unknown')
+    
+    # Fill missing birth year with median
+    df_clean = fill_missing_numeric(df_clean, ['member_birth_year'], method='median')
+    
+    # Calculate age from birth year
+    df_clean = calculate_age_from_year(df_clean, 'member_birth_year', 'age')
+    
+    # Convert duration from seconds to minutes and hours
+    df_clean = convert_duration(
+        df_clean,
+        'duration_sec',
+        minutes_col='duration_minutes',
+        hours_col='duration_hours'
+    )
+    
+    # Convert categorical columns to category type
+    df_clean = convert_to_category(
+        df_clean,
+        ['user_type', 'member_gender', 'bike_share_for_all_trip']
+    )
+    
+    # Remove any duplicates
+    df_clean = remove_duplicates(df_clean)
+    
+    return df_clean
+
+
+def get_trip_statistics_by_group(df: pd.DataFrame, group_col: str) -> pd.DataFrame:
+    """
+    Get trip statistics grouped by a specified column.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Ford GoBike DataFrame.
+    group_col : str
+        Column to group by (e.g., 'user_type', 'member_gender').
+    
+    Returns:
+    --------
+    pd.DataFrame
+        Grouped statistics for duration.
+    """
+    stats = df.groupby(group_col)['duration_minutes'].agg([
+        'count',
+        'mean',
+        'median',
+        'std',
+        'min',
+        'max'
+    ]).round(2)
+    
+    return stats
+
+
+def get_user_statistics(df: pd.DataFrame) -> Dict:
+    """
+    Get summary statistics about users in the Ford GoBike dataset.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Ford GoBike DataFrame.
+    
+    Returns:
+    --------
+    dict
+        Dictionary with user statistics.
+    """
+    return {
+        'total_trips': len(df),
+        'total_users': df['bike_id'].nunique(),
+        'unique_start_stations': df['start_station_id'].nunique(),
+        'unique_end_stations': df['end_station_id'].nunique(),
+        'avg_trip_duration_minutes': df['duration_minutes'].mean(),
+        'median_trip_duration_minutes': df['duration_minutes'].median(),
+        'user_type_counts': df['user_type'].value_counts().to_dict(),
+        'gender_distribution': df['member_gender'].value_counts().to_dict(),
+        'avg_user_age': df['age'].mean(),
+        'bike_share_for_all_usage': df['bike_share_for_all_trip'].value_counts().to_dict(),
+    }
